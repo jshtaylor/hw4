@@ -248,18 +248,23 @@ int main(int argc, char* argv[]) {
 	int num_cars = 0; // number of cars (intially 0)
 	int crash_count = 0;
 	int crash_timer = 0; // cool-off period of a crash
+
+	// 1. Pre-allocate memory for vector to eliminate reallocations
+	size_t total_seconds = static_cast<size_t>(dur.GetTimeCodeAsSeconds());
+	data.reserve(total_seconds);
+
+	// Cache common values outside the loop
+
+	std::cout << "\r" << "99%" << std::flush;
+
 	for(TimeCode t = TimeCode(); t < dur; t = t + TimeCode(0, 0, 1)){
-		int progress = percentage(t.GetTimeCodeAsSeconds(), dur.GetTimeCodeAsSeconds());
-		std::cout << "\r" << progress << "%" << std::flush;
-
-		ALL();
-
+		//deleted ALL()
 		// --- New Cars Show Up (maybe) ---
 		int num_new_cars = poisson(new_car_rate);
 		if(num_cars >= CAP){
 			num_new_cars = 0; // road is full, no new cars
 		}
-		total_num_cars = total_num_cars + BigInteger(std::to_string(num_new_cars));
+		total_num_cars = total_num_cars + BigInteger(num_new_cars);
 
 		// --- Existing Cars Might Leave ---
 		// Strong assumptions of model here!
@@ -303,20 +308,24 @@ int main(int argc, char* argv[]) {
 
 
 	// Find the times at which certain amount of cars are present
+
+	//changes this bullshit to not be o(n^2)
 	std::cout << "Computing sample statistics..." << std::endl;
 	std::unordered_map<int, std::vector<TimeCode>> count_times;
-	for(size_t i = 0; i < data.size(); i++){
-		int progress = percentage(i, data.size());
+	count_times.reserve(64);
+	const size_t total_size = data.size();
+	for(size_t i = 0; i < total_size; i++){
+
+		if ( i % 1000 == 0 || i == total_size - 1){
+		int progress = percentage(i, total_size);
 		std::cout << "\r" << progress << "%" << std::flush;
-		data_point_pair cur = data[i];
-		if(count_times.find(cur.num_cars) != count_times.end()){
-			std::vector<TimeCode> times_list = count_times[cur.num_cars];
-			times_list.push_back(cur.t);
-			count_times[cur.num_cars] = times_list;
-		} else {
-			count_times[cur.num_cars] = std::vector<TimeCode>{cur.t};
 		}
+		const data_point_pair& cur = data[i];
+
+		count_times[cur.num_cars].push_back(cur.t);
 	}
+
+
 	std::cout << "\n---Simulation Finished---" << std::endl;
 
 
@@ -340,8 +349,6 @@ int main(int argc, char* argv[]) {
 	res.x_data = x_data;
 	res.y_data = y_data;
 	res.plotted_duration = TimeCode(0, 0, DURATION_10MIN);
-	res.plotted_duration.WasteTimeAndBeSlow();
-
 
 	generateTerminalOutput(res);
 	generateHTMLoutput(res);
